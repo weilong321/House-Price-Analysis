@@ -1,0 +1,224 @@
+---
+title: "Analysis of House Prices"
+author: "Matthew Chen"
+output:
+  rmdformats::readthedown:
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
+    highlight: tango
+---
+
+```{css newstyles, echo=FALSE}
+body {
+  color: black;
+}
+```
+
+# Executive Summary
+
+The aim of this report is to discuss the differences in prices and structures of houses located in Washington, USA in regards to a variety of factors. Such factors include the number and type of rooms within the house, the condition of the house itself and whether the house has been renovated or not. Through our four research questions, we have gained some important insight into how the values of houses change in regards to the above factors.\
+
+Our main findings were:
+
+1.  The prices of houses increase dramatically with each added room.
+
+2.  Renovating houses increases the property's value as well as improving it's condition.
+
+3.  Renovated or not, a particular house's value does not correlate with the year it is built.
+
+4.  Regarding the structures of an average house of the dataset, the number of bedrooms and bathrooms are quite proportional to the living room area. We also found out that for houses with above and basement areas, they fit a ratio of 6:1 when compared with the area of the living room.
+
+Our analysis would prove quite useful for those seeking information about real estate values such as real estate agents, property investors as well as construction companies as our research discusses the value of a particular property based on a multitude of factors and popular house structures.
+
+# Full Report
+
+## Initial Data Analysis (IDA)
+
+```{r importing data and packages, warning = FALSE, message=FALSE}
+data = read.csv("C:\\Users\\Matthew Chen\\Desktop\\data.csv")
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+```
+
+-   This dataset is by shree1992 (2018) based upon the details of properties in the state of Washington collected over the year of 2014. The dataset is arguably valid although there are a few inconsistencies across the data. Such limitations include some rows having a living room larger than the lot of land and some having renovations before the house was built.
+
+```{r}
+## Living room larger than lot of land??
+which(data$sqft_living > data$sqft_lot)
+## Renovations before the house was built??
+which(data$yr_renovated != 0 & data$yr_renovated < data$yr_built)
+```
+
+```{r}
+## Classification of the variables are shown below
+str(data)
+```
+
+-   Each row of data, except the first row, represents one house and its details.
+-   Each column represents each unique variable.
+-   In the dataset, sqft_lot refers to the amount of land allocated to the property and sqft_above refers to the portion of the home above ground. Other variables are self-explanatory.
+-   We only used the num and int variables thus did not have to change the type of data.
+
+## Research Question 1 -- What is the correlation between price and number of rooms/condition?
+
+#### data wrangling
+
+```{r, message=FALSE}
+newdata <- data[which(data$price !=0), ]
+newdata = newdata %>% mutate(number_room = newdata$bedrooms + newdata$bathrooms) %>% select(number_room,price,condition)
+
+newdata$price = newdata$price = newdata$price / 10000
+```
+
+#### scatter plots to show correlation
+
+```{r scatterplot, echo=TRUE, message=FALSE}
+graph1 = ggplot(newdata, aes(x=number_room, y=price)) + 
+  geom_point(aes(colour = condition)) + 
+  scale_y_log10() + geom_smooth(method=lm , color="red", se= TRUE)+
+  stat_cor(method='pearson', aes(x=number_room, y=price)) + 
+  stat_cor(method='spearman', aes(x=number_room, y=price), colour='red',label.y = log(1))+
+  theme_bw() + 
+  xlab("Number of Rooms") + 
+  ylab("Price x $10,000")
+graph1
+```
+
+```{r message=FALSE}
+graph2 = ggplot(newdata, aes(x=number_room, y=price)) + 
+  geom_point(aes(colour = condition)) + scale_y_log10() + 
+  facet_wrap(~condition) + 
+  geom_smooth(method=lm , color="orange", se= TRUE)+
+  stat_cor(method='pearson', aes(x=number_room, y=price, colour= condition), label.y = log(1),label.x=2.5) +
+  stat_cor(method='spearman', aes(x=number_room, y=price), colour='black',label.y = log(20))+
+  theme_bw() +
+  xlab("Number of Rooms") +
+  ylab("Price x $10,000")
+graph2
+```
+
+> From the graphs, **the number of rooms and the price of houses are positively correlated as the number of rooms increases**. We did not consider the influence of the number of rooms on the house price under different conditions. Using the stat_cor function to calculate the correlation coefficient of the two graphs obtained 0.5 and 0.49, respectively meaning it is moderately correlated. Therefore, **regardless of the difference in conditions, the number of rooms will affect the price**. According to the graphs, when the condition is 2-5, the number of rooms and the influence of the room is about 0.5. The results obtained by Pearson and Spearson calculations are almost the same. When the condition is 1, although the coefficient obtained by Pearson is 0.56, the value obtained by Spearson is 0.74. This is because there is an outlier in the graph with condition of 1. Spearman's calculation method emphasizes the monotonic relationship between the two variables evaluated. The Pearson correlation coefficient will be affected because Pearson emphasizes linearity. Spearman is relatively robust because the correlation coefficient of Pearson is more sensitive to data errors and extreme values. When the condition is 1, we take the value of Spearson as a reference of 0.74. **It is a strong relationship which means the increase in the number of rooms will make the price of the room grow rapidly.**
+
+## Research Question 2 -- What is the price difference between renovated houses and non-renovated houses based on condition?
+
+#### data wrangling
+
+```{r}
+hasnotbeen <- filter(data, yr_renovated == 0)%>%select(price, condition)
+hasnotbeen <- hasnotbeen[-c(2588), ]
+hasbeen <- filter(data, yr_renovated != 0)%>%select(price, condition)
+hasbeen <- hasbeen[-c(1761), ]
+```
+
+#### parabolic plot to show correlation
+
+```{r}
+ggplot(hasnotbeen, aes(condition, price/10000)) +
+    geom_point(aes(colour = condition))+
+    geom_smooth(method = "lm", formula = y ~ x + I(x^2))+
+    xlab("Condition of Not Renovated House")+
+    ylab("Price x $10,000") + 
+    theme_bw()
+ggplot(hasbeen, aes(condition, price/10000)) +
+    geom_point(aes(colour = condition))+
+    geom_smooth(method = "lm", formula = y ~ x + I(x^2))+
+    xlab("Condition of Renovated House")+
+    ylab("Price x $10,000") + 
+    theme_bw()
+```
+
+> By filtering the dataset into "hasbeenrenovated" and "hasnotbeenrenovated"; we could find a comparison between the two in respect to house conditions. Firstly, getting rid of the outliers made it possible for the graphs to be easily compared within the same scale. From the two graphs, there is a **slight increase in price disparity between renovated houses and non-renovated houses**. The geom_smooth() function shows that the slope of the renovated houses is slightly greater than the slope in the non-renovated houses, meaning **the average price has increased**. An expected find was the comparison between the conditions of houses between the two groups. The **renovated houses' conditions were much higher than the non-renovated houses** with only one renovated house being of condition 2. The results from Bogin & Doerner, 2019 about how property renovation contributes to the house price index **confirms that most property renovations will indeed raise the value of the house**. Despite this, they also argue that there are a number of factors contributing to the increased value of renovations. For example, the location of the houses near the centre of a major city will increase value more than houses at the outer edges.
+
+## Research Question 3 -- Taking into consideration the renovation status of the house, what is the relationship between the price and the year the house was built?
+
+#### data wrangling
+
+```{r}
+ndata = data %>% select(price,yr_built,yr_renovated)
+ren_data = ndata %>% filter(yr_renovated >0)
+nren_data = ren_data %>% select(price, yr_built)
+nren_data = ndata %>% filter(yr_renovated ==0)
+```
+
+#### scatter plots to show non-correlation
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(data = ren_data,aes(x=yr_built, y=price/10000))+
+  geom_point(color="red")+
+  stat_smooth(method="lm",se=FALSE)+
+  stat_cor(data=ren_data,method="pearson")+
+  scale_y_log10() + 
+  theme_bw() +
+  xlab("Year Renovated House Built") +
+  ylab("Price x $10,000")
+ggplot(data = nren_data,aes(x=yr_built,y=price/10000))+
+  geom_point(color="red")+
+  stat_smooth(method="lm")+
+  stat_cor(data=nren_data,method="pearson")+
+  scale_y_log10() + theme_bw()+
+  xlab("Year Non-Renovated House Built") +
+  ylab("Price x $10,000")
+```
+
+> Building upon the analysis of price differences between renovated and non-renovated houses, we decided to research whether the year the house was built affected the price. First, all the renovated houses were extracted and their averages were calculated by the mean equation and plotted. From this graph, it is obvious that **the price of the renovated house and the year of construction are not correlated**, and the R-value and p-value obtained by the Pearson calculation method are 0.0086 and 0.71 respectively, which are almost uncorrelated. The average price of a house that has not been renovated was calculated by the same method, and in fact, the results are quite similar to the non-renovated houses. **The graph also shows that there is not much relationship between the price of a house, the year it was built and whether it was renovated or not**. As Bogin & Doerner (2019) states, there are a multitude of factors influencing the prices of renovated and non-renovated houses.
+
+## Research Question 4 -- What is the average house structure in this dataset?
+
+#### data wrangling
+
+```{r}
+bedrooms = data$bedrooms
+bathrooms = data$bathrooms
+floors = data$floors
+living = data$sqft_living
+basement = data$sqft_basement
+above = data$sqft_above
+df <- data.frame(
+    group = c( "sqft_above", "sqft_basement"),
+    percentage = c((mean(above)/mean(living))*100, (mean(basement)/mean(living))*100)
+)
+ 
+```
+
+#### scatter plot to show correlation
+
+```{r, warning = FALSE, message = FALSE}
+ggplot(data, aes(living, bathrooms))+
+  geom_point()+
+  geom_smooth(method = "lm")
+ggplot(data, aes(living, bedrooms))+
+  geom_point()+
+  geom_smooth(method = "lm") 
+```
+
+> The first graph shows the proportion between living area and bathrooms, while the second graph shows the proportion between living area and bedrooms. As shown in the figures, **both ratios are proportional; the larger the area of living, the larger the size of bedrooms or bathrooms**. In addition, the correlation coefficient of living and bathrooms is 0.76, which is 0.17 larger than that of living and bedrooms, indicating that the association of living and bathrooms is stronger.
+
+#### barplot to show percentage of basement and above area in terms of living area
+
+```{r}
+bp<- ggplot(df, aes(x='', y=percentage, fill=group))+
+  geom_bar(width = 0.5, stat = "identity") + 
+  theme_bw()+
+  ylab("Percentage in terms of Living Area")+
+  xlab("")
+bp
+```
+
+> The bar plot shows the proportions of the above area and basement area in regards to the living area. The proportions of the above area and basement area are 85.4% and 14.6%, respectively. As a result, the ratio of the above area to the basement area is about 6:1. According to a survey by Bump (2014), in the United States, about 42 percent of these houses have basements.
+
+```{r}
+v <- c(basement)
+percentage <- (sum(v>0)/ 4600)*100
+percentage
+```
+
+> 40.32% of houses in this dataset have basements, which is in line with the 2014 status in the United States.
+
+# References
+
+> -   Bogin, A. N., & Doerner, W. M. (2019a). Property Renovations and Their Impact on House Price Index Construction. Journal of Real Estate Research, 41(2), 249--284. <https://doi.org/10.1080/10835547.2019.12091526>
+> -   House price prediction. (2018, August 26). [Dataset]. <https://www.kaggle.com/shree1992/housedata>\
+> -   US Census Bureau. (2014, December 14). National Demographic Analysis Tables: 2014 [Dataset]. <https://www.census.gov/data/tables/2014/demo/popest/2014-demographic-analysis-tables.html>
